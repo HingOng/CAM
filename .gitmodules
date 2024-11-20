@@ -91,11 +91,11 @@
 
 [submodule "mpas"]
 	path = src/dynamics/mpas/dycore
-	url = https://github.com/MPAS-Dev/MPAS-Model.git
+	url = https://github.com/HingOng/MPAS-Model.git
         fxrequired = AlwaysRequired
         fxsparse = ../.mpas_sparse_checkout
-        fxtag = v8.2.1
-	fxDONOTUSEurl = https://github.com/MPAS-Dev/MPAS-Model.git
+        fxtag = 41e9a3f
+	fxDONOTUSEurl = https://github.com/HingOng/MPAS-Model.git
 
 [submodule "cosp2"]
 	path = src/physics/cosp2/src
