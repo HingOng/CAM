@@ -1354,6 +1354,7 @@ subroutine cam_mpas_namelist_read(namelistFilename, configPool)
    real(r8)                :: mpas_smdiv = 0.1_r8
    real(r8)                :: mpas_apvm_upwinding = 0.5_r8
    logical                 :: mpas_h_ScaleWithMesh = .true.
+   logical                 :: mpas_deep_atmosphere = .false.
    real(r8)                :: mpas_zd = 22000.0_r8
    real(r8)                :: mpas_xnutr = 0.2_r8
    real(r8)                :: mpas_cam_coef = 0.0_r8
@@ -1402,7 +1403,8 @@ subroutine cam_mpas_namelist_read(namelistFilename, configPool)
            mpas_epssm, &
            mpas_smdiv, &
            mpas_apvm_upwinding, &
-           mpas_h_ScaleWithMesh
+           mpas_h_ScaleWithMesh, &
+           mpas_deep_atmosphere
 
    namelist /damping/ &
            mpas_zd, &
@@ -1492,6 +1494,7 @@ subroutine cam_mpas_namelist_read(namelistFilename, configPool)
    call mpi_bcast(mpas_smdiv,                        1, mpi_real8,     masterprocid, mpicom, mpi_ierr)
    call mpi_bcast(mpas_apvm_upwinding,               1, mpi_real8,     masterprocid, mpicom, mpi_ierr)
    call mpi_bcast(mpas_h_ScaleWithMesh,              1, mpi_logical,   masterprocid, mpicom, mpi_ierr)
+   call mpi_bcast(mpas_deep_atmosphere,              1, mpi_logical,   masterprocid, mpicom, mpi_ierr)
 
    call mpas_pool_add_config(configPool, 'config_time_integration', mpas_time_integration)
    call mpas_pool_add_config(configPool, 'config_time_integration_order', mpas_time_integration_order)
@@ -1526,6 +1529,7 @@ subroutine cam_mpas_namelist_read(namelistFilename, configPool)
    call mpas_pool_add_config(configPool, 'config_smdiv', mpas_smdiv)
    call mpas_pool_add_config(configPool, 'config_apvm_upwinding', mpas_apvm_upwinding)
    call mpas_pool_add_config(configPool, 'config_h_ScaleWithMesh', mpas_h_ScaleWithMesh)
+   call mpas_pool_add_config(configPool, 'config_deep_atmosphere', mpas_deep_atmosphere)
 
    ! Read namelist group &damping
    if (masterproc) then
@@ -1700,6 +1704,7 @@ subroutine cam_mpas_namelist_read(namelistFilename, configPool)
       write(iulog,*) '   mpas_smdiv = ', mpas_smdiv
       write(iulog,*) '   mpas_apvm_upwinding = ', mpas_apvm_upwinding
       write(iulog,*) '   mpas_h_ScaleWithMesh = ', mpas_h_ScaleWithMesh
+      write(iulog,*) '   mpas_deep_atmosphere = ', mpas_deep_atmosphere
       write(iulog,*) '   mpas_zd = ', mpas_zd
       write(iulog,*) '   mpas_xnutr = ', mpas_xnutr
       write(iulog,*) '   mpas_cam_coef = ', mpas_cam_coef

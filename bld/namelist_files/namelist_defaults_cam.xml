@@ -3446,6 +3446,7 @@
 <mpas_apvm_upwinding          > 0.5D0 </mpas_apvm_upwinding>
 <mpas_apvm_upwinding hgrid="mpasa120" waccm_phys="1"> 0.0D0 </mpas_apvm_upwinding>
 <mpas_h_ScaleWithMesh         > .true. </mpas_h_ScaleWithMesh>
+<mpas_deep_atmosphere         > .false. </mpas_deep_atmosphere>
 <mpas_zd                      > 22000.0D0 </mpas_zd>
 <mpas_zd hgrid="mpasa120" waccm_phys="1"> 80000.0D0 </mpas_zd>
 <mpas_xnutr                   > 0.2D0 </mpas_xnutr>

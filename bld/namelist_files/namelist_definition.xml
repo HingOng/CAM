@@ -8588,6 +8588,12 @@ in MPAS dycore.
 Default: TRUE
 </entry>
 
+<entry id="mpas_deep_atmosphere" type="logical" category="mpas"
+       group="nhyd_model" valid_values="">
+Deep atmosphere configuration in MPAS dycore.
+Default: FALSE
+</entry>
+
 <entry id="mpas_zd" type="real" category="mpas"
        group="damping" valid_values="">
 Height in meters above MSL to begin w-damping profile in MPAS dycore.

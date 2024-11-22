@@ -4258,6 +4258,7 @@ if ($dyn =~ /mpas/) {
     add_default($nl, 'mpas_smdiv');
     add_default($nl, 'mpas_apvm_upwinding');
     add_default($nl, 'mpas_h_ScaleWithMesh');
+    add_default($nl, 'mpas_deep_atmosphere');
     add_default($nl, 'mpas_zd');
     add_default($nl, 'mpas_xnutr');
     add_default($nl, 'mpas_cam_coef');
