@@ -65,6 +65,7 @@ subroutine d_p_coupling(phys_state, phys_tend, pbuf2d, dyn_out)
    real(r8), pointer :: exner(:,:)
    real(r8), pointer :: zint(:,:)
    real(r8), pointer :: zz(:,:)
+   real(r8), pointer :: rTildeCell(:,:)
    real(r8), pointer :: rho_zz(:,:)
    real(r8), pointer :: ux(:,:)
    real(r8), pointer :: uy(:,:)
@@ -124,6 +125,7 @@ subroutine d_p_coupling(phys_state, phys_tend, pbuf2d, dyn_out)
 
    zint     => dyn_out % zint
    zz       => dyn_out % zz
+   rTildeCell => dyn_out % rTildeCell
    rho_zz   => dyn_out % rho_zz
    ux       => dyn_out % ux
    uy       => dyn_out % uy
@@ -135,7 +137,7 @@ subroutine d_p_coupling(phys_state, phys_tend, pbuf2d, dyn_out)
    if (compute_energy_diags) then
      call tot_energy_dyn(nCellsSolve, plev,size(tracers, 1), index_qv, zz(:,1:nCellsSolve), zint(:,1:nCellsSolve), &
           rho_zz(:,1:nCellsSolve), theta_m(:,1:nCellsSolve), tracers(:,:,1:nCellsSolve),&
-          ux(:,1:nCellsSolve),uy(:,1:nCellsSolve),'dBF')
+          ux(:,1:nCellsSolve),uy(:,1:nCellsSolve), rTildeCell(:,1:nCellsSolve),'dBF')
    end if
    !
    ! diagnose pintdry, pmiddry, pmid
@@ -151,7 +153,7 @@ subroutine d_p_coupling(phys_state, phys_tend, pbuf2d, dyn_out)
 
    call hydrostatic_pressure( &
         nCellsSolve, plev, size(tracers, 1), index_qv, zz, zint, rho_zz, theta_m, exner, tracers,&
-        pmiddry, pintdry, pmid)
+        pmiddry, pintdry, pmid, rTildeCell)
 
    if (use_gw_front .or. use_gw_front_igw) then
       call cam_mpas_update_halo('scalars', endrun)   ! scalars is the name of tracers in the MPAS state pool
@@ -613,6 +615,7 @@ subroutine derived_tend(nCellsSolve, nCells, t_tend, u_tend, v_tend, q_tend, dyn
    ! variables for energy diagnostics
    !
    real(r8), pointer :: zz(:,:)
+   real(r8), pointer :: rTildeCell(:,:)
    real(r8), pointer :: theta_m(:,:)
    real(r8), pointer :: zint(:,:)
    real(r8), pointer :: ux(:,:)
@@ -645,6 +648,9 @@ subroutine derived_tend(nCellsSolve, nCells, t_tend, u_tend, v_tend, q_tend, dyn
    rho_zz      => dyn_in % rho_zz
    tracers     => dyn_in % tracers
    index_qv    =  dyn_in % index_qv
+
+   rTildeCell  => dyn_in % rTildeCell
+
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    ! Momentum tendency
@@ -768,7 +774,7 @@ subroutine derived_tend(nCellsSolve, nCells, t_tend, u_tend, v_tend, q_tend, dyn
           nCellsSolve, plev, size(tracers, 1), index_qv, zz(:,1:nCellsSolve), zint(:,1:nCellsSolve), rho_zz(:,1:nCellsSolve), &
           theta_m_new,  tracers(:,:,1:nCellsSolve),   &
           ux(:,1:nCellsSolve)+dtime*u_tend(:,1:nCellsSolve)/rho_zz(:,1:nCellsSolve),       &
-          uy(:,1:nCellsSolve)+dtime*v_tend(:,1:nCellsSolve)/rho_zz(:,1:nCellsSolve),'dAP')
+          uy(:,1:nCellsSolve)+dtime*v_tend(:,1:nCellsSolve)/rho_zz(:,1:nCellsSolve), rTildeCell(:,1:nCellsSolve),'dAP')
      ! revert
      do m=dry_air_species_num+1,thermodynamic_active_species_num
        idx_dycore                         = thermodynamic_active_species_idx_dycore(m)
@@ -782,7 +788,7 @@ subroutine derived_tend(nCellsSolve, nCells, t_tend, u_tend, v_tend, q_tend, dyn
           nCellsSolve, plev, size(tracers, 1), index_qv, zz(:,1:nCellsSolve), zint(:,1:nCellsSolve), &
           rho_zz(:,1:nCellsSolve), theta_m_new, tracers(:,:,1:nCellsSolve),    &
           ux(:,1:nCellsSolve)+dtime*u_tend(:,1:nCellsSolve)/rho_zz(:,1:nCellsSolve),       &
-          uy(:,1:nCellsSolve)+dtime*v_tend(:,1:nCellsSolve)/rho_zz(:,1:nCellsSolve),'dAM')
+          uy(:,1:nCellsSolve)+dtime*v_tend(:,1:nCellsSolve)/rho_zz(:,1:nCellsSolve), rTildeCell(:,1:nCellsSolve),'dAM')
    end if
    !
    ! compute energy based on parameterization increment (excl. water change)
@@ -804,7 +810,7 @@ end subroutine derived_tend
 
 !=========================================================================================
 subroutine hydrostatic_pressure(nCells, nVertLevels, qsize, index_qv, zz, zgrid, rho_zz, theta_m, &
-     exner, q, pmiddry, pintdry,pmid)
+     exner, q, pmiddry, pintdry,pmid, rTildeCell)
    ! Compute dry hydrostatic pressure at layer interfaces and midpoints
    !
    ! Given arrays of zz, zgrid, rho_zz, and theta_m from the MPAS-A prognostic
@@ -828,7 +834,8 @@ subroutine hydrostatic_pressure(nCells, nVertLevels, qsize, index_qv, zz, zgrid,
    real(r8), dimension(nVertLevels, nCells),       intent(out):: pmiddry ! layer midpoint dry hydrostatic pressure [Pa]
    real(r8), dimension(nVertLevels+1, nCells),     intent(out):: pintdry ! layer interface dry hydrostatic pressure [Pa]
    real(r8), dimension(nVertLevels, nCells),       intent(out):: pmid    ! layer midpoint hydrostatic pressure [Pa]
-
+   real(r8), dimension(nVertLevels, nCells),       intent(in) :: rTildeCell! Nondimensianal radius of cells [-]
+   
    ! Local variables
    integer :: iCell, k, idx
    real(r8), dimension(nVertLevels)          :: dz       ! Geometric layer thickness in column
@@ -888,7 +895,7 @@ subroutine hydrostatic_pressure(nCells, nVertLevels, qsize, index_qv, zz, zgrid,
     end do
 end subroutine hydrostatic_pressure
 
-subroutine tot_energy_dyn(nCells, nVertLevels, qsize, index_qv, zz, zgrid, rho_zz, theta_m, q, ux,uy,outfld_name_suffix)
+subroutine tot_energy_dyn(nCells, nVertLevels, qsize, index_qv, zz, zgrid, rho_zz, theta_m, q, ux,uy, rTildeCell,outfld_name_suffix)
   use physconst,         only: rair, gravit
   use mpas_constants,    only: p0,cv,rv,rgas,cp
   use cam_history,       only: outfld, hist_fld_active
@@ -907,6 +914,7 @@ subroutine tot_energy_dyn(nCells, nVertLevels, qsize, index_qv, zz, zgrid, rho_z
   integer, intent(in) :: qsize
   integer, intent(in) :: index_qv
   real(r8), dimension(nVertLevels, nCells),       intent(in) :: zz      ! d(zeta)/dz [-]
+  real(r8), dimension(nVertLevels, nCells),       intent(in) :: rTildeCell! Nondimensional radius [-]
   real(r8), dimension(nVertLevels+1, nCells),     intent(in) :: zgrid   ! geometric heights of layer interfaces [m]
   real(r8), dimension(nVertLevels, nCells),       intent(in) :: rho_zz  ! dry density / zz [kg m^-3]
   real(r8), dimension(nVertLevels, nCells),       intent(in) :: theta_m ! modified potential temperature

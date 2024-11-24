@@ -1357,6 +1357,10 @@ contains
        type (field1DReal), pointer :: meshScalingDel2
        type (field1DReal), pointer :: meshScalingDel4
        type (field2DReal), pointer :: dss
+       type (field2DReal), pointer :: rTildeCell
+       type (field2DReal), pointer :: rTildeLayer
+       type (field2DReal), pointer :: rTildeEdge
+       type (field2DReal), pointer :: rTildeVertex
        type (field2DReal), pointer :: east
        type (field2DReal), pointer :: north
        type (field2DReal), pointer :: pressure_p
@@ -1481,6 +1485,10 @@ contains
        call mpas_pool_get_field(allFields, 'meshScalingDel2', meshScalingDel2)
        call mpas_pool_get_field(allFields, 'meshScalingDel4', meshScalingDel4)
        call mpas_pool_get_field(allFields, 'dss', dss)
+       call mpas_pool_get_field(allFields, 'rTildeCell', rTildeCell)
+       call mpas_pool_get_field(allFields, 'rTildeLayer', rTildeLayer)
+       call mpas_pool_get_field(allFields, 'rTildeEdge', rTildeEdge)
+       call mpas_pool_get_field(allFields, 'rTildeVertex', rTildeVertex)
        call mpas_pool_get_field(allFields, 'east', east)
        call mpas_pool_get_field(allFields, 'north', north)
        call mpas_pool_get_field(allFields, 'pressure_p', pressure_p)
@@ -1665,6 +1673,14 @@ contains
        call MPAS_streamAddField(restart_stream, meshScalingDel4, ierr=ierr)
        if (ierr /= MPAS_STREAM_NOERR) ierr_total = ierr_total + 1
        call MPAS_streamAddField(restart_stream, dss, ierr=ierr)
+       if (ierr /= MPAS_STREAM_NOERR) ierr_total = ierr_total + 1
+       call MPAS_streamAddField(restart_stream, rTildeCell, ierr=ierr)
+       if (ierr /= MPAS_STREAM_NOERR) ierr_total = ierr_total + 1
+       call MPAS_streamAddField(restart_stream, rTildeLayer, ierr=ierr)
+       if (ierr /= MPAS_STREAM_NOERR) ierr_total = ierr_total + 1
+       call MPAS_streamAddField(restart_stream, rTildeEdge, ierr=ierr)
+       if (ierr /= MPAS_STREAM_NOERR) ierr_total = ierr_total + 1
+       call MPAS_streamAddField(restart_stream, rTildeVertex, ierr=ierr)
        if (ierr /= MPAS_STREAM_NOERR) ierr_total = ierr_total + 1
        call MPAS_streamAddField(restart_stream, east, ierr=ierr)
        if (ierr /= MPAS_STREAM_NOERR) ierr_total = ierr_total + 1
@@ -1866,6 +1882,10 @@ contains
        call cam_mpas_update_halo('meshScalingDel2', endrun)
        call cam_mpas_update_halo('meshScalingDel4', endrun)
        call cam_mpas_update_halo('dss', endrun)
+       call cam_mpas_update_halo('rTildeCell', endrun)
+       call cam_mpas_update_halo('rTildeLayer', endrun)
+       call cam_mpas_update_halo('rTildeEdge', endrun)
+       call cam_mpas_update_halo('rTildeVertex', endrun)
        call cam_mpas_update_halo('east', endrun)
        call cam_mpas_update_halo('north', endrun)
        call cam_mpas_update_halo('pressure_p', endrun)

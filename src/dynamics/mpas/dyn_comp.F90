@@ -129,6 +129,10 @@ type dyn_import_t
                                                   ! of the sphere [dimensionless]       (3,ncol)
    integer, dimension(:,:), pointer :: cellsOnEdge ! Indices of cells separated by an edge (2,nedge)
 
+   !
+   ! Invariant -- nondimensional radius
+   !
+   real(r8), dimension(:,:),   pointer :: rTildeCell! Nondimensional radius of cells (nver,ncol)
 
    !
    ! State that may be directly derived from dycore prognostic state
@@ -211,6 +215,11 @@ type dyn_export_t
 
    real(r8), dimension(:,:),     pointer :: utangential  ! velocity tangent to cell edge,
                                                          ! diagnosed by mpas
+
+   !
+   ! Invariant -- nondimensional radius
+   !
+   real(r8), dimension(:,:),   pointer :: rTildeCell! Nondimensional radius of cells (nver,ncol)
 
    !
    ! State that may be directly derived from dycore prognostic state
@@ -457,6 +466,8 @@ subroutine dyn_init(dyn_in, dyn_out)
    call mpas_pool_get_array(mesh_pool,  'edgeNormalVectors',      dyn_in % normal)
    call mpas_pool_get_array(mesh_pool,  'cellsOnEdge',            dyn_in % cellsOnEdge)
 
+   call mpas_pool_get_array(mesh_pool,  'rTildeCell',             dyn_in % rTildeCell)
+
    call mpas_pool_get_array(diag_pool,  'theta',                  dyn_in % theta)
    call mpas_pool_get_array(diag_pool,  'exner',                  dyn_in % exner)
    call mpas_pool_get_array(diag_pool,  'rho',                    dyn_in % rho)
@@ -490,6 +501,7 @@ subroutine dyn_init(dyn_in, dyn_out)
    dyn_out % zz    => dyn_in % zz
    dyn_out % fzm   => dyn_in % fzm
    dyn_out % fzp   => dyn_in % fzp
+   dyn_out % rTildeCell => dyn_in % rTildeCell
 
    dyn_out % theta => dyn_in % theta
    dyn_out % exner => dyn_in % exner
@@ -699,6 +711,7 @@ subroutine dyn_final(dyn_in, dyn_out)
    nullify(dyn_in % north)
    nullify(dyn_in % normal)
    nullify(dyn_in % cellsOnEdge)
+   nullify(dyn_in % rTildeCell)
    nullify(dyn_in % theta)
    nullify(dyn_in % exner)
    nullify(dyn_in % rho)
@@ -729,6 +742,7 @@ subroutine dyn_final(dyn_in, dyn_out)
    nullify(dyn_out % zz)
    nullify(dyn_out % fzm)
    nullify(dyn_out % fzp)
+   nullify(dyn_out % rTildeCell)
    nullify(dyn_out % theta)
    nullify(dyn_out % exner)
    nullify(dyn_out % rho)
@@ -787,6 +801,7 @@ subroutine read_inidat(dyn_in)
                                      ! at layer interfaces            (nver+1,ncol)
    real(r8), pointer :: zz(:,:)      ! Vertical coordinate metric [dimensionless]
                                      ! at layer midpoints               (nver,ncol)
+   real(r8), pointer :: rTildeCell(:,:)! Nondimensional radius of cells (nver,ncol)
    real(r8), pointer :: theta(:,:)   ! Potential temperature [K]        (nver,ncol)
    real(r8), pointer :: rho(:,:)     ! Dry density [kg/m^3]             (nver,ncol)
    real(r8), pointer :: ux(:,:)      ! Zonal veloc at center [m/s]      (nver,ncol)
@@ -845,6 +860,7 @@ subroutine read_inidat(dyn_in)
 
    zint       => dyn_in % zint
    zz         => dyn_in % zz
+   rTildeCell => dyn_in % rTildeCell
    theta      => dyn_in % theta
    rho        => dyn_in % rho
    ux         => dyn_in % ux
@@ -1239,6 +1255,7 @@ subroutine set_base_state(dyn_in)
    integer :: iCell, klev
    real(r8), dimension(:,:), pointer :: zint
    real(r8), dimension(:,:), pointer :: zz
+   real(r8), dimension(:,:), pointer :: rTildeCell
    real(r8), dimension(:,:), pointer :: rho_base
    real(r8), dimension(:,:), pointer :: theta_base
    real(r8) :: zmid
@@ -1250,6 +1267,7 @@ subroutine set_base_state(dyn_in)
 
    zint       => dyn_in % zint
    zz         => dyn_in % zz
+   rTildeCell => dyn_in % rTildeCell
    rho_base   => dyn_in % rho_base
    theta_base => dyn_in % theta_base
 
@@ -1758,7 +1776,7 @@ subroutine set_dry_mass(dyn_in, target_avg_dry_surface_pressure)
    real(r8), pointer :: tracers(:,:,:) ! Tracers [kg/kg dry air]       (nq,nver,ncol)
    real(r8), pointer :: zz(:,:)      ! Vertical coordinate metric [dimensionless]
                                      ! at layer midpoints               (nver,ncol)
-
+   real(r8), pointer :: rTildeCell(:,:)! Nondimensional raius of cells  (nver,ncol)
    real(r8), allocatable :: preliminary_dry_surface_pressure(:), p_top(:), pm(:)
    real(r8) :: preliminary_avg_dry_surface_pressure, scaled_avg_dry_surface_pressure
    real(r8) :: scaling_ratio
@@ -1777,6 +1795,7 @@ subroutine set_dry_mass(dyn_in, target_avg_dry_surface_pressure)
    rho        => dyn_in % rho
    rho_zz     => dyn_in % rho_zz
    zz         => dyn_in % zz
+   rTildeCell => dyn_in % rTildeCell
    tracers    => dyn_in % tracers
 
    allocate( p_top(nCellsSolve), preliminary_dry_surface_pressure(nCellsSolve), pm(plev), stat=ierr)
