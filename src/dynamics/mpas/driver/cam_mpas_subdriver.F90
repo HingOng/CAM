@@ -938,6 +938,7 @@ contains
        type (field0DReal), pointer :: cf1, cf2, cf3
        type (field1DReal), pointer :: rdzw, dzu, rdzu, fzm, fzp
        type (field2DReal), pointer :: zgrid, zxu, zz
+       type (field2DReal), pointer :: rTildeCell, rTildeLayer, rTildeEdge, rTildeVertex
        type (field3DReal), pointer :: zb, zb3, deriv_two, cellTangentPlane, coeffs_reconstruct
 
        type (field2DReal), pointer :: edgeNormalVectors, localVerticalUnitVectors, defc_a, defc_b
@@ -1018,6 +1019,11 @@ contains
        call mpas_pool_get_field(meshPool, 'zz', zz)
        call mpas_pool_get_field(meshPool, 'zb', zb)
        call mpas_pool_get_field(meshPool, 'zb3', zb3)
+
+       call mpas_pool_get_field(meshPool, 'rTildeCell', rTildeCell)
+       call mpas_pool_get_field(meshPool, 'rTildeLayer', rTildeLayer)
+       call mpas_pool_get_field(meshPool, 'rTildeEdge', rTildeEdge)
+       call mpas_pool_get_field(meshPool, 'rTildeVertex', rTildeVertex)
 
        call mpas_pool_get_field(meshPool, 'deriv_two', deriv_two)
        call mpas_pool_get_field(meshPool, 'cellTangentPlane', cellTangentPlane)
@@ -1150,6 +1156,15 @@ contains
        call MPAS_streamAddField(mesh_stream, zb3, ierr=ierr)
        if (ierr /= MPAS_STREAM_NOERR) ierr_total = ierr_total + 1
 
+       call MPAS_streamAddField(mesh_stream, rTildeCell, ierr=ierr)
+       if (ierr /= MPAS_STREAM_NOERR) ierr_total = ierr_total + 1
+       call MPAS_streamAddField(mesh_stream, rTildeLayer, ierr=ierr)
+       if (ierr /= MPAS_STREAM_NOERR) ierr_total = ierr_total + 1
+       call MPAS_streamAddField(mesh_stream, rTildeEdge, ierr=ierr)
+       if (ierr /= MPAS_STREAM_NOERR) ierr_total = ierr_total + 1
+       call MPAS_streamAddField(mesh_stream, rTildeVertex, ierr=ierr)
+       if (ierr /= MPAS_STREAM_NOERR) ierr_total = ierr_total + 1
+
        call MPAS_streamAddField(mesh_stream, deriv_two, ierr=ierr)
        if (ierr /= MPAS_STREAM_NOERR) ierr_total = ierr_total + 1
        call MPAS_streamAddField(mesh_stream, cellTangentPlane, ierr=ierr)
@@ -1243,6 +1258,11 @@ contains
        call MPAS_dmpar_exch_halo_field(zz)
        call MPAS_dmpar_exch_halo_field(zb)
        call MPAS_dmpar_exch_halo_field(zb3)
+
+       call MPAS_dmpar_exch_halo_field(rTildeCell)
+       call MPAS_dmpar_exch_halo_field(rTildeLayer)
+       call MPAS_dmpar_exch_halo_field(rTildeEdge)
+       call MPAS_dmpar_exch_halo_field(rTildeVertex)
 
        call MPAS_dmpar_exch_halo_field(deriv_two)
        call MPAS_dmpar_exch_halo_field(cellTangentPlane)
@@ -2281,6 +2301,7 @@ contains
        integer, pointer :: index_qv
        integer, pointer :: nCellsSolve
        real(kind=RKIND), dimension(:,:), pointer :: theta_m, rho_zz, zz, theta, rho
+       real(kind=RKIND), dimension(:,:), pointer :: rTildeCell
        real(kind=RKIND), dimension(:,:,:), pointer :: scalars
 
        integer, save :: itimestep = 1
@@ -2326,6 +2347,7 @@ contains
        call mpas_pool_get_array(state, 'rho_zz', rho_zz, timeLevel=1)
        call mpas_pool_get_array(state, 'scalars', scalars, timeLevel=1)
        call mpas_pool_get_array(mesh, 'zz', zz)
+       call mpas_pool_get_array(mesh, 'rTildeCell', rTildeCell)
        call mpas_pool_get_array(diag, 'theta', theta)
        call mpas_pool_get_array(diag, 'rho', rho)
 
