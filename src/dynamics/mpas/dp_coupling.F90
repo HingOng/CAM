@@ -66,6 +66,7 @@ subroutine d_p_coupling(phys_state, phys_tend, pbuf2d, dyn_out)
    real(r8), pointer :: zint(:,:)
    real(r8), pointer :: zz(:,:)
    real(r8), pointer :: rTildeCell(:,:)
+   real(r8), pointer :: rTildeLayer(:,:)
    real(r8), pointer :: rho_zz(:,:)
    real(r8), pointer :: ux(:,:)
    real(r8), pointer :: uy(:,:)
@@ -126,6 +127,7 @@ subroutine d_p_coupling(phys_state, phys_tend, pbuf2d, dyn_out)
    zint     => dyn_out % zint
    zz       => dyn_out % zz
    rTildeCell => dyn_out % rTildeCell
+   rTildeLayer => dyn_out % rTildeLayer
    rho_zz   => dyn_out % rho_zz
    ux       => dyn_out % ux
    uy       => dyn_out % uy
@@ -137,7 +139,7 @@ subroutine d_p_coupling(phys_state, phys_tend, pbuf2d, dyn_out)
    if (compute_energy_diags) then
      call tot_energy_dyn(nCellsSolve, plev,size(tracers, 1), index_qv, zz(:,1:nCellsSolve), zint(:,1:nCellsSolve), &
           rho_zz(:,1:nCellsSolve), theta_m(:,1:nCellsSolve), tracers(:,:,1:nCellsSolve),&
-          ux(:,1:nCellsSolve),uy(:,1:nCellsSolve), rTildeCell(:,1:nCellsSolve),'dBF')
+          ux(:,1:nCellsSolve),uy(:,1:nCellsSolve), rTildeCell(:,1:nCellsSolve), rTildeLayer(1,1:nCellsSolve),'dBF')
    end if
    !
    ! diagnose pintdry, pmiddry, pmid
@@ -210,7 +212,7 @@ subroutine d_p_coupling(phys_state, phys_tend, pbuf2d, dyn_out)
       i = block_index
 
       phys_state(lchnk)%psdry(icol_p) = pintdry(1,i)
-      phys_state(lchnk)%phis(icol_p) = zint(1,i) * gravit
+      phys_state(lchnk)%phis(icol_p) = zint(1,i) * gravit / rTildeLayer(1,i)**2
 
       do k = 1, pver                                  ! vertical index in physics chunk
          kk = pver - k + 1                            ! vertical index in dynamics block
@@ -219,7 +221,7 @@ subroutine d_p_coupling(phys_state, phys_tend, pbuf2d, dyn_out)
                                              Rv_over_Rd * tracers(index_qv,kk,i)) * exner(kk,i)
          phys_state(lchnk)%u(icol_p,k)       = ux(kk,i)
          phys_state(lchnk)%v(icol_p,k)       = uy(kk,i)
-         phys_state(lchnk)%omega(icol_p,k)   = -rho_zz(kk,i)*zz(kk,i)*gravit*0.5_r8*(w(kk,i)+w(kk+1,i))   ! omega
+         phys_state(lchnk)%omega(icol_p,k)   = -rho_zz(kk,i)*zz(kk,i)*gravit/rTildeCell(kk,i)**4*0.5_r8*(w(kk,i)+w(kk+1,i))   ! omega
          phys_state(lchnk)%pmiddry(icol_p,k) = pmiddry(kk,i)
          phys_state(lchnk)%pmid(icol_p,k)    = pmid(kk,i)
 
@@ -616,6 +618,7 @@ subroutine derived_tend(nCellsSolve, nCells, t_tend, u_tend, v_tend, q_tend, dyn
    !
    real(r8), pointer :: zz(:,:)
    real(r8), pointer :: rTildeCell(:,:)
+   real(r8), pointer :: rTildeLayer(:,:)
    real(r8), pointer :: theta_m(:,:)
    real(r8), pointer :: zint(:,:)
    real(r8), pointer :: ux(:,:)
@@ -650,7 +653,7 @@ subroutine derived_tend(nCellsSolve, nCells, t_tend, u_tend, v_tend, q_tend, dyn
    index_qv    =  dyn_in % index_qv
 
    rTildeCell  => dyn_in % rTildeCell
-
+   rTildeLayer => dyn_in % rTildeLayer
 
    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    ! Momentum tendency
@@ -659,8 +662,8 @@ subroutine derived_tend(nCellsSolve, nCells, t_tend, u_tend, v_tend, q_tend, dyn
    !
    ! Couple u and v tendencies with rho_zz
    !
-   u_tend(:,:) = u_tend(:,:) * rho_zz(:,:)
-   v_tend(:,:) = v_tend(:,:) * rho_zz(:,:)
+   u_tend(:,:) = u_tend(:,:) * rho_zz(:,:) / rTildeCell(:,:)**2
+   v_tend(:,:) = v_tend(:,:) * rho_zz(:,:) / rTildeCell(:,:)**2
 
    !
    ! Update halos for u_tend and v_tend
@@ -727,7 +730,7 @@ subroutine derived_tend(nCellsSolve, nCells, t_tend, u_tend, v_tend, q_tend, dyn
    !
    do iCell = 1, nCellsSolve
      do k = 1, pver
-       rhodk     = zz(k,iCell) * rho_zz(k,iCell)
+       rhodk     = zz(k,iCell) * rho_zz(k,iCell) / rTildeCell(k,iCell)**2
        facold    = 1.0_r8 + Rv_over_Rd *qwv(k,iCell)
        thetak    = theta_m(k,iCell)/facold
        exnerk    = (rgas*rhodk*theta_m(k,iCell)/p0)**(rgas/cv)
@@ -773,8 +776,9 @@ subroutine derived_tend(nCellsSolve, nCells, t_tend, u_tend, v_tend, q_tend, dyn
      call tot_energy_dyn( &
           nCellsSolve, plev, size(tracers, 1), index_qv, zz(:,1:nCellsSolve), zint(:,1:nCellsSolve), rho_zz(:,1:nCellsSolve), &
           theta_m_new,  tracers(:,:,1:nCellsSolve),   &
-          ux(:,1:nCellsSolve)+dtime*u_tend(:,1:nCellsSolve)/rho_zz(:,1:nCellsSolve),       &
-          uy(:,1:nCellsSolve)+dtime*v_tend(:,1:nCellsSolve)/rho_zz(:,1:nCellsSolve), rTildeCell(:,1:nCellsSolve),'dAP')
+          ux(:,1:nCellsSolve)+dtime*u_tend(:,1:nCellsSolve)/rho_zz(:,1:nCellsSolve)*rTildeCell(:,1:nCellsSolve)**2,       &
+          uy(:,1:nCellsSolve)+dtime*v_tend(:,1:nCellsSolve)/rho_zz(:,1:nCellsSolve)*rTildeCell(:,1:nCellsSolve)**2,       &
+          rTildeCell(:,1:nCellsSolve), rTildeLayer(1,1:nCellsSolve),'dAP')
      ! revert
      do m=dry_air_species_num+1,thermodynamic_active_species_num
        idx_dycore                         = thermodynamic_active_species_idx_dycore(m)
@@ -787,8 +791,9 @@ subroutine derived_tend(nCellsSolve, nCells, t_tend, u_tend, v_tend, q_tend, dyn
      call tot_energy_dyn( &
           nCellsSolve, plev, size(tracers, 1), index_qv, zz(:,1:nCellsSolve), zint(:,1:nCellsSolve), &
           rho_zz(:,1:nCellsSolve), theta_m_new, tracers(:,:,1:nCellsSolve),    &
-          ux(:,1:nCellsSolve)+dtime*u_tend(:,1:nCellsSolve)/rho_zz(:,1:nCellsSolve),       &
-          uy(:,1:nCellsSolve)+dtime*v_tend(:,1:nCellsSolve)/rho_zz(:,1:nCellsSolve), rTildeCell(:,1:nCellsSolve),'dAM')
+          ux(:,1:nCellsSolve)+dtime*u_tend(:,1:nCellsSolve)/rho_zz(:,1:nCellsSolve)*rTildeCell(:,1:nCellsSolve)**2,       &
+          uy(:,1:nCellsSolve)+dtime*v_tend(:,1:nCellsSolve)/rho_zz(:,1:nCellsSolve)*rTildeCell(:,1:nCellsSolve)**2,       &
+          rTildeCell(:,1:nCellsSolve), rTildeLayer(1,1:nCellsSolve),'dAM')
    end if
    !
    ! compute energy based on parameterization increment (excl. water change)
@@ -851,14 +856,14 @@ subroutine hydrostatic_pressure(nCells, nVertLevels, qsize, index_qv, zz, zgrid,
    do iCell = 1, nCells
       dz(:) = zgrid(2:nVertLevels+1,iCell) - zgrid(1:nVertLevels,iCell)
       do k = nVertLevels, 1, -1
-        rhodryk  = zz(k,iCell)* rho_zz(k,iCell) !full CAM physics density
+        rhodryk  = zz(k,iCell)* rho_zz(k,iCell) / rTildeCell(k,iCell)**2 !full CAM physics density
         rhok = 1.0_r8
         do idx=dry_air_species_num+1,thermodynamic_active_species_num
           rhok = rhok+q(thermodynamic_active_species_idx_dycore(idx),k,iCell)
         end do
         rhok     = rhok*rhodryk
-        dp(k)    = gravit*dz(k)*rhok
-        dpdry(k) = gravit*dz(k)*rhodryk
+        dp(k)    = gravit/rTildeCell(k,iCell)**2*dz(k)*rhok
+        dpdry(k) = gravit/rTildeCell(k,iCell)**2*dz(k)*rhodryk
       end do
 
       k = nVertLevels
@@ -866,15 +871,15 @@ subroutine hydrostatic_pressure(nCells, nVertLevels, qsize, index_qv, zz, zgrid,
       do idx=dry_air_species_num+1,thermodynamic_active_species_num
         sum_water = sum_water+q(thermodynamic_active_species_idx_dycore(idx),k,iCell)
       end do
-      rhok     = sum_water*zz(k,iCell) * rho_zz(k,iCell)
+      rhok     = sum_water*zz(k,iCell) * rho_zz(k,iCell) / rTildeCell(k,iCell)**2
       thetavk  = theta_m(k,iCell)/sum_water
       tvk      = thetavk*exner(k,iCell)
-      pk       = dp(k)*rgas*tvk/(gravit*dz(k))
+      pk       = dp(k)*rgas*tvk*rTildeCell(k,iCell)**2/(gravit*dz(k))
       !
       ! model top pressure consistently diagnosed using the assumption that the mid level
       ! is at height z(nVertLevels-1)+0.5*dz
       !
-      pintdry(nVertLevels+1,iCell) = pk-0.5_r8*dz(nVertLevels)*rhok*gravity  !hydrostatic
+      pintdry(nVertLevels+1,iCell) = pk-0.5_r8*dz(nVertLevels)*rhok*gravity/rTildeCell(nVertLevels,iCell)**2  !hydrostatic
       pint   (nVertLevels+1,iCell) = pintdry(nVertLevels+1,iCell)
       do k = nVertLevels, 1, -1
         !
@@ -889,13 +894,13 @@ subroutine hydrostatic_pressure(nCells, nVertLevels, qsize, index_qv, zz, zgrid,
         tk      = tvk*sum_water/(1.0_r8+Rv_over_Rd*q(index_qv,k,iCell))
         pint   (k,iCell) = pint   (k+1,iCell)+dp(k)
         pintdry(k,iCell) = pintdry(k+1,iCell)+dpdry(k)
-        pmid(k,iCell)    = dp(k)   *rgas*tvk/(gravit*dz(k))
-        pmiddry(k,iCell) = dpdry(k)*rgas*tk /(gravit*dz(k))
+        pmid(k,iCell)    = dp(k)   *rgas*tvk*rTildeCell(k,iCell)**2/(gravit*dz(k))
+        pmiddry(k,iCell) = dpdry(k)*rgas*tk *rTildeCell(k,iCell)**2/(gravit*dz(k))
       end do
     end do
 end subroutine hydrostatic_pressure
 
-subroutine tot_energy_dyn(nCells, nVertLevels, qsize, index_qv, zz, zgrid, rho_zz, theta_m, q, ux,uy, rTildeCell,outfld_name_suffix)
+subroutine tot_energy_dyn(nCells, nVertLevels, qsize, index_qv, zz, zgrid, rho_zz, theta_m, q, ux,uy, rTildeCell, rTildeS,outfld_name_suffix)
   use physconst,         only: rair, gravit
   use mpas_constants,    only: p0,cv,rv,rgas,cp
   use cam_history,       only: outfld, hist_fld_active
@@ -914,7 +919,8 @@ subroutine tot_energy_dyn(nCells, nVertLevels, qsize, index_qv, zz, zgrid, rho_z
   integer, intent(in) :: qsize
   integer, intent(in) :: index_qv
   real(r8), dimension(nVertLevels, nCells),       intent(in) :: zz      ! d(zeta)/dz [-]
-  real(r8), dimension(nVertLevels, nCells),       intent(in) :: rTildeCell! Nondimensional radius [-]
+  real(r8), dimension(nVertLevels, nCells),       intent(in) :: rTildeCell! Nondimensional radius of cells [-]
+  real(r8), dimension(             nCells),       intent(in) :: rTildeS ! Nondimensional radius at the surface [-]
   real(r8), dimension(nVertLevels+1, nCells),     intent(in) :: zgrid   ! geometric heights of layer interfaces [m]
   real(r8), dimension(nVertLevels, nCells),       intent(in) :: rho_zz  ! dry density / zz [kg m^-3]
   real(r8), dimension(nVertLevels, nCells),       intent(in) :: theta_m ! modified potential temperature
@@ -953,12 +959,12 @@ subroutine tot_energy_dyn(nCells, nVertLevels, qsize, index_qv, zz, zgrid, rho_z
      do k = 1, nVertLevels
         dz              = zgrid(k+1,iCell) - zgrid(k,iCell)
         zcell(iCell,k)  = 0.5_r8*(zgrid(k,iCell)+zgrid(k+1,iCell))-zgrid(1,iCell)
-        rhod            = zz(k,iCell) * rho_zz(k,iCell)
+        rhod            = zz(k,iCell) * rho_zz(k,iCell) / rTildeCell(k,iCell)**2
         theta           = theta_m(k,iCell)/(1.0_r8 + Rv_over_Rd *q(index_qv,k,iCell))!convert theta_m to theta
         exner           = (rgas*rhod*theta_m(k,iCell)/p0)**(rgas/cv)
 
         temperature(iCell,k)   = exner*theta
-        pdeldry(iCell,k)       = gravit*rhod*dz
+        pdeldry(iCell,k)       = gravit/rTildeCell(k,iCell)**2*rhod*dz
         !
         ! internal energy coefficient for MPAS
         ! (equation 92 in Eldred et al. 2023; https://rmets.onlinelibrary.wiley.com/doi/epdf/10.1002/qj.4353)
@@ -973,7 +979,7 @@ subroutine tot_energy_dyn(nCells, nVertLevels, qsize, index_qv, zz, zgrid, rho_z
         cp_or_cv(iCell,k)      = cv*cp_or_cv(iCell,k)/(sum_species*rair)
         u(iCell,k)             = ux(k,iCell)
         v(iCell,k)             = uy(k,iCell)
-        phis(iCell)            = zgrid(1,iCell)*gravit
+        phis(iCell)            = zgrid(1,iCell)*gravit/rTildeS(iCell)**2
         do idx=dry_air_species_num+1,thermodynamic_active_species_num
            idx_tmp = thermodynamic_active_species_idx_dycore(idx)
            tracers(iCell,k,idx_tmp) = q(idx_tmp,k,iCell)

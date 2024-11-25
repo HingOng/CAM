@@ -133,6 +133,7 @@ type dyn_import_t
    ! Invariant -- nondimensional radius
    !
    real(r8), dimension(:,:),   pointer :: rTildeCell! Nondimensional radius of cells (nver,ncol)
+   real(r8), dimension(:,:),   pointer :: rTildeLayer!Nondimensional radius of layer interfaces (nver+1,ncol)
 
    !
    ! State that may be directly derived from dycore prognostic state
@@ -220,6 +221,7 @@ type dyn_export_t
    ! Invariant -- nondimensional radius
    !
    real(r8), dimension(:,:),   pointer :: rTildeCell! Nondimensional radius of cells (nver,ncol)
+   real(r8), dimension(:,:),   pointer :: rTildeLayer!Nondimensional radius of layer interfaces (nver+1,ncol)
 
    !
    ! State that may be directly derived from dycore prognostic state
@@ -467,6 +469,7 @@ subroutine dyn_init(dyn_in, dyn_out)
    call mpas_pool_get_array(mesh_pool,  'cellsOnEdge',            dyn_in % cellsOnEdge)
 
    call mpas_pool_get_array(mesh_pool,  'rTildeCell',             dyn_in % rTildeCell)
+   call mpas_pool_get_array(mesh_pool,  'rTildeLayer',            dyn_in % rTildeLayer)
 
    call mpas_pool_get_array(diag_pool,  'theta',                  dyn_in % theta)
    call mpas_pool_get_array(diag_pool,  'exner',                  dyn_in % exner)
@@ -501,7 +504,8 @@ subroutine dyn_init(dyn_in, dyn_out)
    dyn_out % zz    => dyn_in % zz
    dyn_out % fzm   => dyn_in % fzm
    dyn_out % fzp   => dyn_in % fzp
-   dyn_out % rTildeCell => dyn_in % rTildeCell
+   dyn_out % rTildeCell  => dyn_in % rTildeCell
+   dyn_out % rTildeLayer => dyn_in % rTildeLayer
 
    dyn_out % theta => dyn_in % theta
    dyn_out % exner => dyn_in % exner
@@ -712,6 +716,7 @@ subroutine dyn_final(dyn_in, dyn_out)
    nullify(dyn_in % normal)
    nullify(dyn_in % cellsOnEdge)
    nullify(dyn_in % rTildeCell)
+   nullify(dyn_in % rTildeLayer)
    nullify(dyn_in % theta)
    nullify(dyn_in % exner)
    nullify(dyn_in % rho)
@@ -743,6 +748,7 @@ subroutine dyn_final(dyn_in, dyn_out)
    nullify(dyn_out % fzm)
    nullify(dyn_out % fzp)
    nullify(dyn_out % rTildeCell)
+   nullify(dyn_out % rTildeLayer)
    nullify(dyn_out % theta)
    nullify(dyn_out % exner)
    nullify(dyn_out % rho)
@@ -1011,13 +1017,13 @@ subroutine read_inidat(dyn_in)
 
          ! integrate up from surface to first mid level.  This is full mid-level pressure (i.e. accounts for vapor).
          ! we are assuming that pintdry(1,i) is the full surface pressure here.
-         pmid(1,i) = pintdry(1,i)/(1.0_r8+0.5_r8*(zint(2,i)-zint(1,i))*(1.0_r8+qv(1))*gravity/(rgas*tm(1)))
+         pmid(1,i) = pintdry(1,i)/(1.0_r8+0.5_r8*(zint(2,i)-zint(1,i))*(1.0_r8+qv(1))*gravity/(rgas*tm(1)*rTildeCell(1,i)**2))
 
          ! integrate up the column
          do k=2,plev
             !  this is full mid-level pressure (i.e. accounts for vapor)
-            pmid(k,i) = pmid(k-1,i)*(1.0_r8-0.5_r8*(zint(k  ,i)-zint(k-1,i))*gravity*(1.0_r8+qv(k-1))/(rgas*tm(k-1)))/ &
-                                    (1.0_r8+0.5_r8*(zint(k+1,i)-zint(k  ,i))*gravity*(1.0_r8+qv(k  ))/(rgas*tm(k  )))
+            pmid(k,i) = pmid(k-1,i)*(1.0_r8-0.5_r8*(zint(k  ,i)-zint(k-1,i))*gravity*(1.0_r8+qv(k-1))/(rgas*tm(k-1)*rTildeCell(k-1,i)**2))/ &
+                                    (1.0_r8+0.5_r8*(zint(k+1,i)-zint(k  ,i))*gravity*(1.0_r8+qv(k  ))/(rgas*tm(k  )*rTildeCell(k  ,i)**2))
          end do
 
          do k=1,plev
@@ -1032,7 +1038,7 @@ subroutine read_inidat(dyn_in)
       deallocate(qv)
       deallocate(tm)
 
-      rho_zz(:,1:nCellsSolve) = rho(:,1:nCellsSolve) / zz(:,1:nCellsSolve)
+      rho_zz(:,1:nCellsSolve) = rho(:,1:nCellsSolve) / zz(:,1:nCellsSolve) * rTildeCell(:,1:nCellsSolve)**2
 
       ! Set theta_base and rho_base
       call set_base_state(dyn_in)
@@ -1108,7 +1114,7 @@ subroutine read_inidat(dyn_in)
          call endrun(subname//': failed to read rho from initial file')
       end if
 
-      rho_zz(:,1:nCellsSolve) = rho(:,1:nCellsSolve) / zz(:,1:nCellsSolve)
+      rho_zz(:,1:nCellsSolve) = rho(:,1:nCellsSolve) / zz(:,1:nCellsSolve) * rTildeCell(:,1:nCellsSolve)**2
 
       ! read theta_base
       call infld('theta_base', fh_ini, 'lev', 'nCells', 1, plev, 1, nCellsSolve, 1, 1, &
@@ -1256,6 +1262,7 @@ subroutine set_base_state(dyn_in)
    real(r8), dimension(:,:), pointer :: zint
    real(r8), dimension(:,:), pointer :: zz
    real(r8), dimension(:,:), pointer :: rTildeCell
+   real(r8), dimension(:,:), pointer :: rTildeLayer
    real(r8), dimension(:,:), pointer :: rho_base
    real(r8), dimension(:,:), pointer :: theta_base
    real(r8) :: zmid
@@ -1267,7 +1274,8 @@ subroutine set_base_state(dyn_in)
 
    zint       => dyn_in % zint
    zz         => dyn_in % zz
-   rTildeCell => dyn_in % rTildeCell
+   rTildeCell  => dyn_in % rTildeCell
+   rTildeLayer => dyn_in % rTildeLayer
    rho_base   => dyn_in % rho_base
    theta_base => dyn_in % theta_base
 
@@ -1279,20 +1287,20 @@ subroutine set_base_state(dyn_in)
 
          klev = dyn_in % nVertLevels
          ! reference pressure at the model top
-         pres_kp1 = p0*exp(-gravity*zint(klev+1,iCell)/(Rgas*t0b))
+         pres_kp1 = p0*exp(-gravity*zint(klev+1,iCell)/(Rgas*t0b*rTildeLayer(klev+1,iCell)**2))
 
          ! integrate down to first mid level, set referfence state
-         pres = pres_kp1/(1.0_r8-0.5_r8*(zint(klev+1,iCell) - zint(klev,iCell))*gravity/(Rgas*t0b))
+         pres = pres_kp1/(1.0_r8-0.5_r8*(zint(klev+1,iCell) - zint(klev,iCell))*gravity/(Rgas*t0b*rTildeCell(klev,iCell)**2))
          theta_base(klev,iCell) = t0b / (pres / p0)**(Rgas/cp)
-         rho_base(klev,iCell) = pres / ( Rgas * t0b * zz(klev,iCell))
+         rho_base(klev,iCell) = pres * rTildeCell(klev,iCell)**2 / ( Rgas * t0b * zz(klev,iCell) )
          pres_kp1 = pres
 
          ! integrate down the column
          do klev = dyn_in % nVertLevels-1, 1, -1
-            pres = pres_kp1*(1.0_r8+0.5_r8*(zint(klev+2,iCell)-zint(klev+1,iCell))*gravity/(rgas*t0b))/  &
-                            (1.0_r8-0.5_r8*(zint(klev+1,iCell)-zint(klev  ,iCell))*gravity/(rgas*t0b))
+            pres = pres_kp1*(1.0_r8+0.5_r8*(zint(klev+2,iCell)-zint(klev+1,iCell))*gravity/(rgas*t0b*rTildeCell(klev+1,iCell)**2))/  &
+                            (1.0_r8-0.5_r8*(zint(klev+1,iCell)-zint(klev  ,iCell))*gravity/(rgas*t0b*rTildeCell(klev  ,iCell)**2))
             theta_base(klev,iCell) = t0b / (pres / p0)**(Rgas/cp)
-            rho_base(klev,iCell) = pres / ( Rgas * t0b * zz(klev,iCell))
+            rho_base(klev,iCell) = pres * rTildeCell(klev,iCell)**2 / ( Rgas * t0b * zz(klev,iCell) )
             pres_kp1 = pres
          end do
       end do
@@ -1302,9 +1310,9 @@ subroutine set_base_state(dyn_in)
       do iCell = 1, dyn_in % nCellsSolve
          do klev = 1, dyn_in % nVertLevels
             zmid = 0.5_r8 * (zint(klev,iCell) + zint(klev+1,iCell))   ! Layer midpoint geometric height
-            pres = p0 * exp(-gravity * zmid / (Rgas * t0b))
+            pres = p0 * exp(-gravity * zmid / (Rgas * t0b * rTildeCell(klev,iCell)**2))
             theta_base(klev,iCell) = t0b / (pres / p0)**(Rgas/cp)
-            rho_base(klev,iCell) = pres / ( Rgas * t0b * zz(klev,iCell))
+            rho_base(klev,iCell) = pres * rTildeCell(klev,iCell)**2 / ( Rgas * t0b * zz(klev,iCell))
          end do
       end do
 
@@ -1803,14 +1811,14 @@ subroutine set_dry_mass(dyn_in, target_avg_dry_surface_pressure)
    ! (1) calculate pressure at the lid
    do i=1, nCellsSolve
       p_top(i) = p0*(rgas*rho(plev,i)*theta_m(plev,i)/p0)**(cpair/(cpair-rgas))
-      p_top(i) = p_top(i) - gravity*0.5_r8*(zint(plev+1,i)-zint(plev,i))*rho(plev,i)*(1.0_r8+tracers(ixqv,plev,i))
+      p_top(i) = p_top(i) - gravity/rTildeCell(plev,i)**2*0.5_r8*(zint(plev+1,i)-zint(plev,i))*rho(plev,i)*(1.0_r8+tracers(ixqv,plev,i))
    end do
 
    ! (2) integrate dry mass in column
    do i=1, nCellsSolve
       preliminary_dry_surface_pressure(i) = 0.0_r8
       do k=1, plev
-         preliminary_dry_surface_pressure(i) = preliminary_dry_surface_pressure(i) + gravity*(zint(k+1,i)-zint(k,i))*rho(k,i)
+         preliminary_dry_surface_pressure(i) = preliminary_dry_surface_pressure(i) + gravity/rTildeCell(k,i)**2*(zint(k+1,i)-zint(k,i))*rho(k,i)
       end do
    end do
 
@@ -1834,7 +1842,7 @@ subroutine set_dry_mass(dyn_in, target_avg_dry_surface_pressure)
    do i = 1, nCellsSolve
        preliminary_dry_surface_pressure(i) = 0.0_r8
        do k = 1, plev
-           preliminary_dry_surface_pressure(i) = preliminary_dry_surface_pressure(i) + gravity*(zint(k+1,i)-zint(k,i))*rho(k,i)
+           preliminary_dry_surface_pressure(i) = preliminary_dry_surface_pressure(i) + gravity/rTildeCell(k,i)**2*(zint(k+1,i)-zint(k,i))*rho(k,i)
        end do
    end do
    preliminary_dry_surface_pressure(1:nCellsSolve) = preliminary_dry_surface_pressure(1:nCellsSolve)*areaCell(1:nCellsSolve)
@@ -1851,10 +1859,10 @@ subroutine set_dry_mass(dyn_in, target_avg_dry_surface_pressure)
 
    ! (6) integrate down the column to compute full pressure given the density and qv
    do i=1,nCellsSolve
-      pm(plev) = p_top(i) + 0.5_r8*(zint(plev+1,i)-zint(plev,i))*gravity*rho(plev,i)*(1.0_r8+tracers(ixqv,plev,i))
+      pm(plev) = p_top(i) + 0.5_r8*(zint(plev+1,i)-zint(plev,i))*gravity/rTildeCell(plev,i)**2*rho(plev,i)*(1.0_r8+tracers(ixqv,plev,i))
       do k=plev-1,1,-1
-         pm(k) = pm(k+1) + 0.5_r8*(zint(k+2,i)-zint(k+1,i))*gravity*rho(k+1,i)*(1.0_r8+tracers(ixqv,k+1,i)) &
-                         + 0.5_r8*(zint(k+1,i)-zint(k  ,i))*gravity*rho(k  ,i)*(1.0_r8+tracers(ixqv,k  ,i))
+         pm(k) = pm(k+1) + 0.5_r8*(zint(k+2,i)-zint(k+1,i))*gravity/rTildeCell(k+1,i)**2*rho(k+1,i)*(1.0_r8+tracers(ixqv,k+1,i)) &
+                         + 0.5_r8*(zint(k+1,i)-zint(k  ,i))*gravity/rTildeCell(k  ,i)**2*rho(k  ,i)*(1.0_r8+tracers(ixqv,k  ,i))
       end do
 
    ! (7) compute theta_m from the state equation, compute rho_zz and theta while we are here
@@ -1862,7 +1870,7 @@ subroutine set_dry_mass(dyn_in, target_avg_dry_surface_pressure)
       do k=1,plev
          theta_m(k,i) = (pm(k)/p0)**((cpair-rgas)/cpair)*p0/rgas/rho(k,i)
          theta(k,i) = theta_m(k,i)/(1.0_r8 + Rv_over_Rd * tracers(ixqv,k,i))
-         rho_zz(k,i) = rho(k,i)/zz(k,i)
+         rho_zz(k,i) = rho(k,i)/zz(k,i)*rTildeCell(k,i)**2
       end do
    end do
 

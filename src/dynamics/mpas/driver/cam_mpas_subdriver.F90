@@ -2351,7 +2351,7 @@ contains
        call mpas_pool_get_array(diag, 'theta', theta)
        call mpas_pool_get_array(diag, 'rho', rho)
 
-       rho(:,1:nCellsSolve) = rho_zz(:,1:nCellsSolve) * zz(:,1:nCellsSolve)
+       rho(:,1:nCellsSolve) = rho_zz(:,1:nCellsSolve) * zz(:,1:nCellsSolve) / rTildeCell(:,1:nCellsSolve)**2
        theta(:,1:nCellsSolve) = theta_m(:,1:nCellsSolve) / (1.0_RKIND + Rv_over_Rd * scalars(index_qv,:,1:nCellsSolve))
 
     end subroutine cam_mpas_run
