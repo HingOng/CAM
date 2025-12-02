@@ -3607,6 +3607,8 @@ if ($clubb_sgs  =~ /$TRUE/io) {
    add_default($nl, 'clubb_l_mono_flux_lim_vm');
    add_default($nl, 'clubb_l_partial_upwind_wp3');
    add_default($nl, 'clubb_l_predict_upwp_vpwp');
+   add_default($nl, 'clubb_l_nontraditional_Coriolis');
+   add_default($nl, 'clubb_l_traditional_Coriolis');
    add_default($nl, 'clubb_l_rcm_supersat_adj');
    add_default($nl, 'clubb_l_smooth_Heaviside_tau_wpxp');
    add_default($nl, 'clubb_l_stability_correct_tau_zm');

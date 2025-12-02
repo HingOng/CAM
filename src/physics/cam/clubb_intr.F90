@@ -20,7 +20,7 @@ module clubb_intr
   use shr_kind_mod,        only: r8=>shr_kind_r8
   use ppgrid,              only: pver, pverp, pcols, begchunk, endchunk
   use phys_control,        only: phys_getopts
-  use physconst,           only: cpair, gravit, rga, latvap, latice, zvir, rh2o, karman, pi, rair
+  use physconst,           only: cpair, gravit, rga, latvap, latice, zvir, rh2o, karman, pi, rair, omega
   use air_composition,     only: rairv, cpairv
   use cam_history_support, only: max_fieldname_len
 
@@ -240,6 +240,10 @@ module clubb_intr
                                           ! advance_xm_wpxp.  Otherwise, <u'w'> and <v'w'> are still
                                           ! approximated by eddy diffusivity when <u> and <v> are
                                           ! advanced in subroutine advance_windm_edsclrm.
+    clubb_l_nontraditional_Coriolis,    & ! Flag to implement the nontraditional Coriolis terms in the
+                                          ! prognostic equations of <w'w'>, <u'w'>, and <u'u'>.
+    clubb_l_traditional_Coriolis,       & ! Flag to implement the traditional Coriolis terms in the
+                                          ! prognostic equations of <v'w'> and <u'w'>.
     clubb_l_min_wp2_from_corr_wx,       & ! Flag to base the threshold minimum value of wp2 on keeping
                                           ! the overall correlation of w and x (w and rt, as well as w
                                           ! and theta-l) within the limits of -max_mag_correlation_flux
@@ -858,6 +862,8 @@ end subroutine clubb_init_cnst
          clubb_l_mono_flux_lim_vm, &
          clubb_l_partial_upwind_wp3, &
          clubb_l_predict_upwp_vpwp, &
+         clubb_l_nontraditional_Coriolis, &
+         clubb_l_traditional_Coriolis, &
          clubb_l_prescribed_avg_deltaz, &
          clubb_l_rcm_supersat_adj, &
          clubb_l_rtm_nudge, &
@@ -911,6 +917,8 @@ end subroutine clubb_init_cnst
                                              clubb_saturation_equation, & ! Out
                                              clubb_l_use_precip_frac, & ! Out
                                              clubb_l_predict_upwp_vpwp, & ! Out
+                                             clubb_l_nontraditional_Coriolis, & ! Out
+                                             clubb_l_traditional_Coriolis, & ! Out
                                              clubb_l_min_wp2_from_corr_wx, & ! Out
                                              clubb_l_min_xp2_from_corr_wx, & ! Out
                                              clubb_l_C2_cloud_frac, & ! Out
@@ -1158,6 +1166,10 @@ end subroutine clubb_init_cnst
     if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: clubb_l_damp_wp3_Skw_squared")
     call mpi_bcast(clubb_l_predict_upwp_vpwp,         1, mpi_logical, mstrid, mpicom, ierr)
     if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: clubb_l_predict_upwp_vpwp")
+    call mpi_bcast(clubb_l_nontraditional_Coriolis,   1, mpi_logical, mstrid, mpicom, ierr)
+    if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: clubb_l_nontraditional_Coriolis")
+    call mpi_bcast(clubb_l_traditional_Coriolis,      1, mpi_logical, mstrid, mpicom, ierr)
+    if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: clubb_l_traditional_Coriolis")
     call mpi_bcast(clubb_l_min_wp2_from_corr_wx,         1, mpi_logical, mstrid, mpicom, ierr)
     if (ierr /= 0) call endrun(sub//": FATAL: mpi_bcast: clubb_l_min_wp2_from_corr_wx")
     call mpi_bcast(clubb_l_min_xp2_from_corr_wx,         1, mpi_logical, mstrid, mpicom, ierr)
@@ -1336,6 +1348,8 @@ end subroutine clubb_init_cnst
                                                  clubb_saturation_equation, & ! In
                                                  clubb_l_use_precip_frac, & ! In
                                                  clubb_l_predict_upwp_vpwp, & ! In
+                                                 clubb_l_nontraditional_Coriolis, & ! In
+                                                 clubb_l_traditional_Coriolis, & ! In
                                                  clubb_l_min_wp2_from_corr_wx, & ! In
                                                  clubb_l_min_xp2_from_corr_wx, & ! In
                                                  clubb_l_C2_cloud_frac, & ! In
@@ -2214,6 +2228,7 @@ end subroutine clubb_init_cnst
     ! NOTE: THESE VARIABLS SHOULD NOT BE USED IN PBUF OR OUTFLD (HISTORY) SUBROUTINES
     real(r8), dimension(state%ncol) :: &
       fcor, &                             ! Coriolis forcing 			      	[s^-1]
+      fcory, &                            ! Nontraditional Coriolis parameter           [s^-1]
       sfc_elevation, &    		  ! Elevation of ground			      	[m AMSL][m]
       wpthlp_sfc, &                       ! w' theta_l' at surface                      [(m K)/s]
       wprtp_sfc, &                        ! w' r_t' at surface                          [(kg m)/( kg s)]
@@ -3004,7 +3019,11 @@ end subroutine clubb_init_cnst
       ! Determine Coriolis force at given latitude. This is never used
       ! when CLUBB is implemented in a host model, therefore just set
       ! to zero.
-      fcor(i) = 0._r8
+      ! New: CLUBB uses fcor and fcory in the prognostic equations of 
+      !      upwp, vpwp, wp2, and up2
+      ! Hing Ong, 18 July 2025
+      fcor(i)  = 2._r8 * omega * sin(state1%lat(i))
+      fcory(i) = 2._r8 * omega * cos(state1%lat(i))
     end do
 
     if ( sclr_dim > 0 ) then
@@ -3741,7 +3760,7 @@ end subroutine clubb_init_cnst
       !  Advance CLUBB CORE one timestep in the future
       call t_startf('clubb_tend_cam:advance_clubb_core_api')
       call advance_clubb_core_api( gr, nzm_clubb, ncol, &
-          l_implemented, dtime, fcor, sfc_elevation, &
+          l_implemented, dtime, fcor, fcory, sfc_elevation, &
           hydromet_dim, &
           sclr_dim, sclr_tol, edsclr_dim, sclr_idx, &
           thlm_forcing, rtm_forcing, um_forcing, vm_forcing, &
