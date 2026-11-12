@@ -298,7 +298,7 @@ contains
     use mo_usrrxt,         only : usrrxt, has_ice_trp_rxts
     use mo_setinv,         only : setinv
     use mo_negtrc,         only : negtrc
-    use mo_sulf,           only : sulf_interp
+    use mo_sulf,           only : sulf_interp, read_sulf
     use mo_setext,         only : setext
     use fire_emissions,    only : fire_emissions_vrt
     use mo_sethet,         only : sethet
@@ -323,7 +323,7 @@ contains
     use mo_chm_diags,      only : chm_diags, het_diags
     use perf_mod,          only : t_startf, t_stopf
     use gas_wetdep_opts,   only : gas_wetdep_method
-    use physics_buffer,    only : physics_buffer_desc, pbuf_get_field, pbuf_old_tim_idx
+    use physics_buffer,    only : physics_buffer_desc, pbuf_get_field
     use physics_types,     only : physics_state
     use infnan,            only : nan, assignment(=)
     use rate_diags,        only : rate_diags_calc, rate_diags_o3s_loss
@@ -398,7 +398,6 @@ contains
     real(r8),       pointer    :: cldtop(:)
 
     integer      ::  i, k, m, n
-    integer      ::  tim_ndx
     real(r8)     ::  delt_inverse
     real(r8)     ::  esfact
     real(r8)     ::  invariants(ncol,pver,nfs)
@@ -530,9 +529,8 @@ contains
     !-----------------------------------------------------------------------
     call get_rlat_all_p( lchnk, ncol, rlats )
     call get_rlon_all_p( lchnk, ncol, rlons )
-    tim_ndx = pbuf_old_tim_idx()
     call pbuf_get_field(pbuf, ndx_prain,      prain,  start=(/1,1/), kount=(/ncol,pver/))
-    call pbuf_get_field(pbuf, ndx_cldfr,        cldfr, start=(/1,1,tim_ndx/), kount=(/ncol,pver,1/) )
+    call pbuf_get_field(pbuf, ndx_cldfr,        cldfr, start=(/1,1/), kount=(/ncol,pver/) )
     call pbuf_get_field(pbuf, ndx_cmfdqr,     cmfdqr, start=(/1,1/), kount=(/ncol,pver/))
     call pbuf_get_field(pbuf, ndx_nevapr,     nevapr, start=(/1,1/), kount=(/ncol,pver/))
     call pbuf_get_field(pbuf, ndx_cldtop,     cldtop )
@@ -674,7 +672,7 @@ contains
        strato_sad(:,:) = 0._r8
 
        ! Prognostic modal stratospheric sulfate: compute dry strato_sad
-       call aero_model_strat_surfarea( state, ncol, mmr, pmid, tfld, troplevchem, pbuf, strato_sad, reff_strat )
+       call aero_model_strat_surfarea( state, pmid, tfld, troplevchem, strato_sad, reff_strat )
 
     endif
 
@@ -811,6 +809,7 @@ contains
     if ( .not. carma_hetchem_feedback ) then
        if( so4_ndx < 1 ) then ! get offline so4 field if not prognostic
           call sulf_interp( ncol, lchnk, sulfate )
+          if (read_sulf) call outfld( 'SULFATE', sulfate(:ncol,:), ncol, lchnk )
        else
           sulfate(:,:) = vmr(:,:,so4_ndx)
        endif

@@ -168,7 +168,7 @@
     </options>
   </test>
 
-  <test compset="FHIST" grid="ne3pg3_ne3pg3_mt232" name="ERC_D_Ln9" testmods="cam/nochem_clubbmf">
+  <test compset="FHISTC_LTso" grid="ne3pg3_ne3pg3_mt232" name="ERC_D_Ln9" testmods="cam/nochem_clubbmf">
     <machines>
       <machine name="izumi" compiler="gnu" category="aux_cam"/>
     </machines>
@@ -1062,14 +1062,13 @@
       <option name="wallclock">00:30:00</option>
     </options>
   </test>
-<!--              471                         -->
-  <test compset="QPWmaC6" grid="f10_f10_mg37" name="ERC_D_Ln9" testmods="cam/outfrq3s" supported="false">
+  <test compset="QPWmaC6" grid="f10_f10_mg37" name="ERC_D_Ln9" testmods="cam/outfrq9s_tuvx_waccm_ma_mam5" supported="false">
     <machines>
       <machine name="izumi" compiler="nag" category="aux_cam"/>
       <machine name="izumi" compiler="nag" category="waccm"/>
     </machines>
     <options>
-      <option name="comment" >471 tsm, ter</option>
+      <option name="comment" >TUVx in WACCM</option>
       <option name="wallclock">00:30:00</option>
     </options>
   </test>
@@ -1565,7 +1564,7 @@
       <option name="wallclock">00:20:00</option>
     </options>
   </test>
-  <test compset="FHIST" grid="ne0ARCTICGRISne30x8_ne0ARCTICGRISne30x8_mt12" name="SMS_D_Ln9_P1280x1" testmods="cam/outfrq9s" supported="false">
+  <test compset="FHIST" grid="ne0ARCTICGRISne30x8_ne0ARCTICGRISne30x8_mt12" name="SMS_D_Ln9_P1920x1" testmods="cam/outfrq9s" supported="false">
     <machines>
       <machine name="derecho" compiler="intel" category="prebeta"/>
       <machine name="derecho" compiler="intel" category="cam_refined"/>
@@ -2050,7 +2049,7 @@
       <option name="comment" >Medium-top CAM-Chem with simpler climate chemistry</option>
     </options>
   </test>
-  <test compset="1850C_CAM70%MT%CT4S2_CLM60%SP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV_SESP" grid="ne30pg3_ne30pg3_mt232" name="SMS_D_Ln9" testmods="cam/outfrq9s">
+  <test compset="1850_CAM70%MT%CT4S2_CLM60%SP_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV_SESP" grid="ne30pg3_ne30pg3_mt233" name="SMS_D_Ln9" testmods="cam/outfrq9s">
     <machines>
       <machine name="derecho" compiler="intel" category="camchem"/>
       <machine name="derecho" compiler="intel" category="aux_cam"/>
@@ -2205,13 +2204,14 @@
       <option name="wallclock">00:10:00</option>
     </options>
   </test>
-  <test compset="FX2000" grid="f09_f09_mg17" name="ERS_Ln9"   testmods="cam/outfrq9s">
+  <test compset="FX2000" grid="f09_f09_mg17" name="ERS_Ln9"   testmods="cam/outfrq9s_ltr">
     <machines>
       <machine name="derecho" compiler="intel" category="waccmx"/>
       <machine name="derecho" compiler="intel" category="aux_cam"/>
     </machines>
     <options>
       <option name="wallclock">00:40:00</option>
+      <option name="comment">WACCM-X LTR</option>
     </options>
   </test>
   <test compset="FHISTC_WXma" grid="ne16pg3_ne16pg3_mg17" name="SMS_C2_D_Ln9" testmods="cam/outfrq9s">
@@ -2224,10 +2224,14 @@
       <option name="comment">WACCM-X multi-instance test</option>
     </options>
   </test>
-  <test compset="QPX2000" grid="f19_f19_mg17" name="SMS_D_Ln9_P256x3" testmods="cam/outfrq9s_ltr">
+  <test compset="QPX2000" grid="f19_f19_mg17" name="ERC_D_Ln9_P128x4" testmods="cam/outfrq9s_ltr">
     <machines>
       <machine name="derecho" compiler="intel" category="waccmx"/>
     </machines>
+    <options>
+      <option name="wallclock">00:20:00</option>
+      <option name="comment">WACCM-X LTR threaded test</option>
+    </options>
   </test>
   <test compset="FXHIST" grid="f19_f19_mg17" name="ERS_Ld3"   testmods="cam/outfrq1d_ltr">
     <machines>
@@ -2582,7 +2586,7 @@
       <machine name="derecho" compiler="intel" category="prealpha"/>
     </machines>
   </test>
-  <test compset="FC2000climo" grid="f19_f19_mg17" name="SMS_D_Ln9_P144x3" testmods="cam/outfrq9s_camchem_mam4">
+  <test compset="FC2000climo" grid="f19_f19_mg17" name="SMS_D_Ln9_P64x4" testmods="cam/outfrq9s_camchem_mam4">
     <machines>
       <machine name="derecho" compiler="intel" category="camchem"/>
       <machine name="derecho" compiler="intel" category="prealpha"/>

@@ -779,7 +779,7 @@ subroutine radiation_tend( &
    !       model fields to radiation fields.
    !-----------------------------------------------------------------------
 
-   use physics_buffer,      only: physics_buffer_desc, pbuf_get_field, pbuf_old_tim_idx
+   use physics_buffer,      only: physics_buffer_desc, pbuf_get_field
    use phys_grid,           only: get_rlat_all_p, get_rlon_all_p
    use physics_types,       only: physics_state, physics_ptend
    use time_manager,        only: get_curr_calday
@@ -790,7 +790,7 @@ subroutine radiation_tend( &
    use radlw,               only: radclwmx
    use rad_constituents,    only: rad_cnst_get_gas, rad_cnst_out
    !REMOVECAM
-   use aerosol_mmr_cam, only: rad_aer_diag_out
+   use aerosol_mmr_host, only: rad_aer_diag_out
    !REMOVECAM_END
    use aer_rad_props,       only: aer_rad_props_sw, aer_rad_props_lw
    use interpolate_data,    only: vertinterp
@@ -835,7 +835,6 @@ subroutine radiation_tend( &
 
    real(r8) :: ftem(pcols,pver)               ! Temporary workspace for outfld variables
 
-   integer :: itim_old
    real(r8), pointer, dimension(:,:) :: rel     ! liquid effective drop radius (microns)
    real(r8), pointer, dimension(:,:) :: rei     ! ice effective drop size (microns)
    real(r8), pointer, dimension(:,:) :: cld     ! cloud fraction
@@ -915,8 +914,7 @@ subroutine radiation_tend( &
       write_output=.true.
    end if
 
-   itim_old = pbuf_old_tim_idx()
-   call pbuf_get_field(pbuf, cld_idx,    cld,    start=(/1,1,itim_old/), kount=(/pcols,pver,1/) )
+   call pbuf_get_field(pbuf, cld_idx,    cld )
 
    call pbuf_get_field(pbuf, qrs_idx,qrs)
    call pbuf_get_field(pbuf, qrl_idx,qrl)

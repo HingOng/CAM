@@ -13,7 +13,8 @@ module aerosol_optics_core
   public :: aerosol_optics_sw_bin
   public :: aerosol_optics_lw_bin
 
-  ! Jasper Kok et al. (2017) Fig. 1d: 20-60 % higher mass extinction efficiency
+  ! Jasper Kok et al. (2017) https://doi.org/10.1038/ngeo2912
+  ! Fig. 1d: 20-60 % higher mass extinction efficiency
   ! because dust is aspherical. Currently not captured by the spherical assumption
   ! in the optical calculation. Asphericity is strong for D > 1 um (coarse mode).
   real(r8), parameter, public :: dustaspherical_opts = 1.3_r8
@@ -26,8 +27,9 @@ contains
   ! Returns a null pointer for unrecognized opticstype (caller handles error).
   !===============================================================================
   function create_aerosol_optics_object(aeroprops, aerostate, ibin, &
-                                        ncol, nlev, nswbands, nlwbands, numrh, &
-                                        relh, sulfwtpct, crefwsw, crefwlw, &
+                                        ncol, nlev, top_lev, nswbands, nlwbands, numrh, &
+                                        relh, sulfwtpct, t, pmid, h2ommr, cldn, &
+                                        crefwsw, crefwlw, &
                                         geometric_radius) result(aero_optics)
 
     use phys_prop, only: ot_length
@@ -49,11 +51,16 @@ contains
     integer,     intent(in)                       :: ibin
     integer,     intent(in)                       :: ncol
     integer,     intent(in)                       :: nlev
+    integer,     intent(in)                       :: top_lev
     integer,     intent(in)                       :: nswbands
     integer,     intent(in)                       :: nlwbands
     integer,     intent(in)                       :: numrh
     real(r8),    intent(in)                       :: relh(:, :)
     real(r8),    intent(in)                       :: sulfwtpct(:, :)
+    real(r8),    intent(in)                       :: t(:, :)      ! temperature (K)
+    real(r8),    intent(in)                       :: pmid(:, :)   ! layer pressure (Pa)
+    real(r8),    intent(in)                       :: h2ommr(:, :) ! specific humidity (kg/kg)
+    real(r8),    intent(in)                       :: cldn(:, :)   ! layer cloud fraction (0-1)
     complex(r8), intent(in)                       :: crefwsw(:)
     complex(r8), intent(in)                       :: crefwlw(:)
     real(r8),    intent(in), optional, pointer    :: geometric_radius(:, :)
@@ -69,7 +76,8 @@ contains
     select case (trim(opticstype))
     case ('modal') ! refractive method
       aero_optics => refractive_aerosol_optics(aeroprops, aerostate, ibin, &
-                                               ncol, nlev, nswbands, nlwbands, crefwsw, crefwlw)
+                                               ncol, nlev, top_lev, t, pmid, h2ommr, cldn, &
+                                               nswbands, nlwbands, crefwsw, crefwlw)
     case ('hygroscopic_coreshell')
       aero_optics => hygrocoreshell_aerosol_optics(aeroprops, aerostate, &
                                                    ibin, ncol, nlev, relh)
@@ -111,7 +119,8 @@ contains
   subroutine aerosol_optics_sw_bin(aeroprops, aerostate, ibin, &
                                    ncol, nlev, top_lev, nswbands, nlwbands, numrh, &
                                    idx_sw_diag, &
-                                   relh, sulfwtpct, mass, crefwsw, crefwlw, &
+                                   relh, sulfwtpct, t, pmid, h2ommr, cldn, &
+                                   mass, crefwsw, crefwlw, &
                                    geometric_radius, &
                                    tau_bin, ssa_bin, asm_bin, &
                                    pabs_vis, dopaer0_vis, &
@@ -131,6 +140,10 @@ contains
     integer,     intent(in) :: idx_sw_diag
     real(r8),    intent(in) :: relh(:, :)
     real(r8),    intent(in) :: sulfwtpct(:, :)
+    real(r8),    intent(in) :: t(:, :)                       ! temperature (K)
+    real(r8),    intent(in) :: pmid(:, :)                    ! layer pressure (Pa)
+    real(r8),    intent(in) :: h2ommr(:, :)                  ! specific humidity (kg/kg)
+    real(r8),    intent(in) :: cldn(:, :)                    ! layer cloud fraction (0-1)
     real(r8),    intent(in) :: mass(:, :)                    ! layer mass (pdeldry*rga)
     complex(r8), intent(in) :: crefwsw(:)
     complex(r8), intent(in) :: crefwlw(:)
@@ -181,8 +194,9 @@ contains
 
     ! Create aerosol optics object
     aero_optics => create_aerosol_optics_object(aeroprops, aerostate, ibin, &
-                                                ncol, nlev, nswbands, nlwbands, numrh, &
-                                                relh, sulfwtpct, crefwsw, crefwlw, &
+                                                ncol, nlev, top_lev, nswbands, nlwbands, numrh, &
+                                                relh, sulfwtpct, t, pmid, h2ommr, cldn, &
+                                                crefwsw, crefwlw, &
                                                 geometric_radius)
 
     if (.not. associated(aero_optics)) then
@@ -226,8 +240,10 @@ contains
     ! extinction compared with spherical coarse-mode dust.
     ! ref: Fig. 1d of Jasper F. Kok et al. (2017)
     if (coarse_dust_mode .and. idx_sw_diag > 0) then
-      wetvol(:ncol, :nlev) = aerostate%wet_volume(aeroprops, ibin, ncol, nlev)
-      watervol(:ncol, :nlev) = aerostate%water_volume(aeroprops, ibin, ncol, nlev)
+      wetvol(:ncol, :nlev) = aerostate%wet_volume(aeroprops, ibin, ncol, nlev, top_lev, &
+                                                  t, pmid, h2ommr, cldn)
+      watervol(:ncol, :nlev) = aerostate%water_volume(aeroprops, ibin, ncol, nlev, top_lev, &
+                                                      t, pmid, h2ommr, cldn)
 
       do ilev = top_lev, nlev
         scatdust(:ncol) = 0._r8
@@ -341,8 +357,9 @@ contains
   ! and raw specific absorption (absorp_bin) for diagnostic use.
   !===============================================================================
   subroutine aerosol_optics_lw_bin(aeroprops, aerostate, ibin, &
-                                   ncol, nlev, nswbands, nlwbands, numrh, &
-                                   relh, sulfwtpct, mass, crefwsw, crefwlw, &
+                                   ncol, nlev, top_lev, nswbands, nlwbands, numrh, &
+                                   relh, sulfwtpct, t, pmid, h2ommr, cldn, &
+                                   mass, crefwsw, crefwlw, &
                                    geometric_radius, &
                                    tau_lw_bin, absorp_bin, &
                                    errmsg, errflg)
@@ -353,12 +370,16 @@ contains
     class(aerosol_properties), intent(in), target :: aeroprops
     class(aerosol_state),      intent(in), target :: aerostate
     integer,     intent(in)         :: ibin
-    integer,     intent(in)         :: ncol, nlev
+    integer,     intent(in)         :: ncol, nlev, top_lev
     integer,     intent(in)         :: nswbands
     integer,     intent(in)         :: nlwbands
     integer,     intent(in)         :: numrh
     real(r8),    intent(in)         :: relh(:, :)
     real(r8),    intent(in)         :: sulfwtpct(:, :)
+    real(r8),    intent(in)         :: t(:, :)      ! temperature (K)
+    real(r8),    intent(in)         :: pmid(:, :)   ! layer pressure (Pa)
+    real(r8),    intent(in)         :: h2ommr(:, :) ! specific humidity (kg/kg)
+    real(r8),    intent(in)         :: cldn(:, :)   ! layer cloud fraction (0-1)
     real(r8),    intent(in)         :: mass(:, :)
     complex(r8), intent(in)         :: crefwsw(:)
     complex(r8), intent(in)         :: crefwlw(:)
@@ -381,8 +402,9 @@ contains
 
     ! Create aerosol optics object
     aero_optics => create_aerosol_optics_object(aeroprops, aerostate, ibin, &
-                                                ncol, nlev, nswbands, nlwbands, numrh, &
-                                                relh, sulfwtpct, crefwsw, crefwlw, &
+                                                ncol, nlev, top_lev, nswbands, nlwbands, numrh, &
+                                                relh, sulfwtpct, t, pmid, h2ommr, cldn, &
+                                                crefwsw, crefwlw, &
                                                 geometric_radius)
 
     if (.not. associated(aero_optics)) then
